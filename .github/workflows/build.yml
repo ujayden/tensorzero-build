@@ -1,0 +1,36 @@
+name: Build Static TensorZero Binary
+
+on:
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # 1. Install the cross-compilation tool "cross"
+      - name: Install Cross
+        run: cargo install cross
+
+      # 2. Build using cross for the musl target (static linux)
+      # We set OPENSSL_STATIC and OPENSSL_DIR variables to ensure
+      # the build system knows to bundle OpenSSL inside the binary.
+      # Most Rust crates respect "vendored" features or these env vars.
+      - name: Build Static Gateway
+        run: |
+          # This command runs the build inside a Docker container managed by 'cross'
+          # that has all the musl tools pre-installed.
+          cross build --release --target x86_64-unknown-linux-musl --bin gateway
+        env:
+          # These tell the openssl-sys crate to build its own static copy
+          OPENSSL_STATIC: 1
+          OPENSSL_LIB_DIR: /usr/lib/x86_64-linux-gnu
+          OPENSSL_INCLUDE_DIR: /usr/include
+
+      # 3. Upload the result
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tensorzero-gateway-static
+          path: target/x86_64-unknown-linux-musl/release/gateway
